@@ -1,0 +1,56 @@
+name: Deploy Frontend
+
+on:
+  repository_dispatch:
+    types: [trigger-from-private]
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: main
+          token: ${{ secrets.PRIVATETOKENPULL }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SAKEY }}'
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: training-project-419308
+
+      - name: Set Docker Image Name and Tag
+        run: |
+          IMAGE_NAME=frontend-ui
+          TAG=$(date +%Y%m%d-%H%M%S)
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t asia-south1-docker.pkg.dev/training-project-419308/skill-matrix/${IMAGE_NAME}:${TAG} ./frontend
+          gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
+          docker push asia-south1-docker.pkg.dev/training-project-419308/skill-matrix/${IMAGE_NAME}:${TAG}
+      
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy frontend-ui \
+            --image=asia-south1-docker.pkg.dev/training-project-419308/skill-matrix/${IMAGE_NAME}:${TAG} \
+            --platform=managed \
+            --region=asia-south1 \
+            --allow-unauthenticated \
+            --quiet
+
+          gcloud run services add-iam-policy-binding frontend-ui \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --region=asia-south1 \
+            --platform=managed \
+            --quiet
