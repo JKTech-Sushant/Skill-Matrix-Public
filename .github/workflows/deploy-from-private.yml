@@ -12,7 +12,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository }}
+          repository: JKTech-Sushant/Skill-Matrix
           ref: main
           token: ${{ secrets.PRIVATETOKENPULL }}
 
